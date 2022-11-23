@@ -25,9 +25,13 @@ class PostFormsTest(TestCase):
 
     def setUp(self):
         # Создаем неавторизованный клиент
+        self.guest_client = Client()
         self.authorized_client = Client()
         # Авторизуем пользователя
         self.authorized_client.force_login(user=PostFormsTest.post.author)
+
+        self.auth_client_not_author_post = Client()
+        self.authorized_client.force_login(self.user)
 
     def test_create_post(self):
         """Валидная форма создает запись в create_post."""
@@ -54,7 +58,7 @@ class PostFormsTest(TestCase):
         )
 
     def test_edit_post(self):
-        """Валидная форма редактирует пост по пути posts:post_edit"""
+        """Валидная форма редактирует пост по пути posts:post_edit."""
         form_data = {
             'text': 'Тестовый тест 3',
             'group': '',
@@ -74,3 +78,40 @@ class PostFormsTest(TestCase):
                 text='Тестовый тест 3',
             ).exists()
         )
+
+    def test_guest_client_cannot_create_post(self):
+        """Неавторизованный клиент не может создать пост."""
+        form_data = {
+            'text': 'Тестовый тест 3',
+            'group': '',
+        }
+        response = self.guest_client.post(
+            reverse('posts:post_create'),
+            data=form_data,
+            follow=True)
+        self.assertRedirects(response, '/auth/login/?next=/create/')
+
+    def test_guest_client_cannot_edit_post(self):
+        """Неавторизованный клиент не может редактировать пост."""
+        form_data = {
+            'text': 'Тестовый тест 3',
+            'group': '',
+        }
+        response = self.guest_client.post(
+            reverse('posts:post_edit', args=(1,)),
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(response, '/auth/login/?next=/posts/1/edit/')
+
+    def test_auth_not_author_post_cannot_edit_post(self):
+        form_data = {
+            'text': 'Тестовый тест 3',
+            'group': '',
+        }
+        response = self.auth_client_not_author_post.post(
+            reverse('posts:post_edit', args=(1,)),
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(response, '/auth/login/?next=/posts/1/edit/')
